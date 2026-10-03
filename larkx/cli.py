@@ -153,12 +153,19 @@ def _interactive_login():
 
 def cmd_send(args):
     client = LarkClient(LarkAuth())
+    st = Storage()
     text = ' '.join(args.text)
-    msg_id = client.send_msg(text, args.chat_id, root_id=args.root)
+    root_id = args.root
+    if args.reply and not root_id:
+        # 被引用的消息若在话题里,引用要带上话题根,否则会落回主会话
+        quoted = st.get_message(args.reply, args.chat_id)
+        if quoted is not None and quoted.scope == 'topic' and quoted.anchor:
+            root_id = quoted.anchor
+    msg_id = client.send_msg(text, args.chat_id, root_id=root_id, reply_to=args.reply)
     if msg_id:
-        st = Storage()
+        in_topic = bool(root_id) and root_id != args.reply
         # 用服务端 id 落库,监听收到回显时会补全这条而不是再插一条
-        st.save_message({'msg_id': msg_id, 'chat_id': args.chat_id, 'chat_type': 0, 'scope': 'topic' if args.root else 'chat', 'anchor': args.root or '', 'from_id': client.auth.user_id, 'msg_type': 4, 'msg_type_name': 'TEXT', 'content': text, 'create_time': int(datetime.now().timestamp())}, sender_name='我', direction='out')
+        st.save_message({'msg_id': msg_id, 'chat_id': args.chat_id, 'chat_type': 0, 'scope': 'topic' if in_topic else 'chat', 'anchor': root_id if in_topic else '', 'root_id': root_id or args.reply or '', 'parent_id': args.reply or root_id or '', 'from_id': client.auth.user_id, 'msg_type': 4, 'msg_type_name': 'TEXT', 'content': text, 'create_time': int(datetime.now().timestamp())}, sender_name='我', direction='out')
         print(f'已发送 msg_id={msg_id}')
         return 0
     print('发送失败', file=sys.stderr)
@@ -410,6 +417,7 @@ def main():
     p.add_argument('chat_id')
     p.add_argument('text', nargs='+')
     p.add_argument('--root', help='话题/线程根消息 id,回复进话题')
+    p.add_argument('--reply', help='引用回复某条消息 id(被引用消息在话题里时自动进话题)')
     p.set_defaults(fn=cmd_send)
     p = sub.add_parser('config', help='查看生效中的配置(配置项写在 .env 里)')
     p.set_defaults(fn=cmd_config)

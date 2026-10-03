@@ -88,6 +88,16 @@ class Storage:
         finally:
             s.close()
 
+    def get_message(self, msg_id: str, chat_id: str=None):
+        s = self.Session()
+        try:
+            q = s.query(Message).filter(Message.msg_id == str(msg_id))
+            if chat_id:
+                q = q.filter(Message.chat_id == str(chat_id))
+            return q.first()
+        finally:
+            s.close()
+
     def get_chat_name(self, chat_id: str) -> str:
         s = self.Session()
         try:

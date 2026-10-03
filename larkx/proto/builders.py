@@ -11,7 +11,8 @@ def wrap_packet(cmd: int, payload_msg, request_id: str) -> P.Packet:
     return pkt
 
 
-def build_send_message_packet(text: str, chat_id: str, request_id: str, root_id: str=None, thread_chat: bool=False) -> P.Packet:
+def build_send_message_packet(text: str, chat_id: str, request_id: str, root_id: str=None, thread_chat: bool=False, reply_to: str=None) -> P.Packet:
+    """root_id: 回复进话题(根消息 id); reply_to: 引用回复某条消息(parentId 指向它, rootId 指向它所在的根, 不设 isReplyInThread 时就是普通的引用样式)。"""
     cid_1 = generate_request_cid()
     cid_2 = generate_request_cid()
     req = P.PutMessageRequest()
@@ -20,9 +21,13 @@ def build_send_message_packet(text: str, chat_id: str, request_id: str, root_id:
     req.cid = cid_1
     req.isNotified = 1
     req.version = 1
-    if root_id:
+    if reply_to and (not root_id or str(root_id) == str(reply_to)):
+        # 引用回复:parentId=rootId=被引用的消息,落在主会话里显示为引用
+        req.rootId = str(reply_to)
+        req.parentId = str(reply_to)
+    elif root_id:
         req.rootId = str(root_id)
-        req.parentId = str(root_id)
+        req.parentId = str(reply_to or root_id)
         # 普通群缺 isReplyInThread 会落进主会话;话题群反而拒收它(replyInThread not support chat)
         if not thread_chat:
             req.isReplyInThread = True
