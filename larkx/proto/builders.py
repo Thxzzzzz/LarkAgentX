@@ -68,9 +68,82 @@ def build_send_message_packet(text: str, chat_id: str, request_id: str, root_id:
     return wrap_packet(5, req, request_id)
 
 
+def _fill_rich_blocks(rt, blocks: list, inner_text: str):
+    """按结构化 spec 填 richText(POST 用)。spec:
+    blocks: [{type:'p', runs:[run]}, {type:'ul', items:[[run]]}, {type:'quote', blocks:[block]}, {type:'blank'}]
+    run: {text, bold?} | {link:{text, href}} | {at:{user_id, text}}
+    实测要点:容器元素(p/ul/li/quote)必须显式带 property 字段(哪怕为空),否则服务端报 unmarshal failed;
+    不要包 DOCS 根节点;innerText 必填;加粗用 TEXT 元素的 style fontWeight + styles/styleRefs。"""
+    counter = [0]
+    used_bold = [False]
+    def nid():
+        counter[0] += 1
+        return str(counter[0])
+    def el(tag, children=(), prop=b'', style=None):
+        i = nid(); e = rt.elements.dictionary[i]; e.tag = tag
+        for ch in children:
+            e.childIds.append(ch)
+        e.property = prop
+        if style:
+            for k, v in style.items():
+                e.style[k] = v
+        return i
+    def run_el(run):
+        if 'link' in run:
+            ap = L.entities.RichTextElement.AnchorProperty()
+            ap.href = str(run['link']['href']); ap.content = str(run['link'].get('text') or run['link']['href'])
+            i = el(6, prop=ap.SerializeToString()); rt.anchorIds.append(i); return i
+        if 'at' in run:
+            at = P.AtProperty(); at.userId = str(run['at']['user_id']); at.content = str(run['at'].get('text') or '')
+            i = el(5, prop=at.SerializeToString()); rt.atIds.append(i); return i
+        tp = P.TextProperty(); tp.content = str(run.get('text', ''))
+        bold = bool(run.get('bold'))
+        used_bold[0] = used_bold[0] or bold
+        return el(1, prop=tp.SerializeToString(), style={'fontWeight': 'bold'} if bold else None)
+    def block_el(block):
+        t = block.get('type', 'p')
+        if t == 'blank':
+            return el(3)
+        if t == 'p':
+            return el(3, [run_el(r) for r in block.get('runs', [])])
+        if t == 'ul':
+            items = [el(28, [run_el(r) for r in runs]) for runs in block.get('items', [])]
+            return el(26, items, prop=bytes.fromhex('0800'))
+        if t == 'quote':
+            return el(29, [block_el(b) for b in block.get('blocks', [])])
+        raise ValueError(f'未知的富文本块类型: {t}')
+    for b in blocks:
+        rt.elementIds.append(block_el(b))
+    if used_bold[0]:
+        st = rt.elements.styles.add(); st.name = 'fontWeight'; st.value = 'bold'
+        rt.elements.styleRefs['fontWeight'].styleIds.append(0)
+    rt.innerText = inner_text
+    rt.version = 1
+
+
+def build_rich_message_packet(spec: dict, inner_text: str, chat_id: str, request_id: str, root_id: str=None, thread_chat: bool=False, reply_to: str=None) -> P.Packet:
+    """结构化富文本(POST)消息,spec 见 _fill_rich_blocks;inner_text 是纯文本摘要(通知/搜索用)。"""
+    req = P.PutMessageRequest()
+    req.type = 2
+    req.chatId = str(chat_id)
+    req.cid = generate_request_cid()
+    req.isNotified = 1
+    req.version = 1
+    if reply_to and (not root_id or str(root_id) == str(reply_to)):
+        req.rootId = str(reply_to)
+        req.parentId = str(reply_to)
+    elif root_id:
+        req.rootId = str(root_id)
+        req.parentId = str(reply_to or root_id)
+        if not thread_chat:
+            req.isReplyInThread = True
+    _fill_rich_blocks(req.content.richText, spec.get('blocks', []), inner_text)
+    return wrap_packet(5, req, request_id)
+
+
 def build_post_message_packet(html: str, chat_id: str, request_id: str, title: str='', root_id: str=None, thread_chat: bool=False, reply_to: str=None) -> P.Packet:
     """富文本(POST)消息:content.text 直接放 HTML 片段,服务端自行解析为富文本元素。
-    实测可用标签:<p> <b> <i> <u> <a href> <ul><li> <ol><li> <blockquote> <at user_id="">;title 可空。"""
+    实测只保留 <p> <a href>;<b>/<i> 在客户端显示为"当前版本不支持",列表/引用被丢弃。结构化的用 build_rich_message_packet。"""
     req = P.PutMessageRequest()
     req.type = 2
     req.chatId = str(chat_id)

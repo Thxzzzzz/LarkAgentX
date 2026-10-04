@@ -145,6 +145,16 @@ class LarkClient:
         resp.raise_for_status()
         return resp.content
 
+    def send_rich(self, spec: dict, inner_text: str, chat_id: str, root_id: str=None, reply_to: str=None):
+        """发结构化富文本(POST)消息;spec 见 builders._fill_rich_blocks。返回消息 id,失败 None。"""
+        thread_chat = bool(root_id) and self.is_thread_chat(chat_id)
+        pkt = builders.build_rich_message_packet(spec, inner_text, str(chat_id), generate_long_request_id(), root_id=root_id, thread_chat=thread_chat, reply_to=reply_to)
+        try:
+            return builders.decode_put_message_response(self._gateway_post(pkt)) or None
+        except Exception as e:
+            logger.error(f'发送富文本失败: {e}')
+            return None
+
     def send_post(self, html: str, chat_id: str, title: str='', root_id: str=None, reply_to: str=None):
         """发富文本(POST)消息,正文是 HTML 片段(<p><b><a href><ul><li><blockquote> 等);返回消息 id,失败 None。"""
         thread_chat = bool(root_id) and self.is_thread_chat(chat_id)

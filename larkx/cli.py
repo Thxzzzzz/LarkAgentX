@@ -161,14 +161,21 @@ def cmd_send(args):
         quoted = st.get_message(args.reply, args.chat_id)
         if quoted is not None and quoted.scope == 'topic' and quoted.anchor:
             root_id = quoted.anchor
-    if args.post:
+    if args.rich:
+        import json as _json
+        spec_src = args.rich[1:] if args.rich.startswith('@') else args.rich
+        if args.rich.startswith('@'):
+            with open(spec_src, encoding='utf-8') as f:
+                spec_src = f.read()
+        msg_id = client.send_rich(_json.loads(spec_src), text, args.chat_id, root_id=root_id, reply_to=args.reply)
+    elif args.post:
         msg_id = client.send_post(text, args.chat_id, title=args.title or '', root_id=root_id, reply_to=args.reply)
     else:
         msg_id = client.send_msg(text, args.chat_id, root_id=root_id, reply_to=args.reply, rich_links=args.links)
     if msg_id:
         in_topic = bool(root_id) and root_id != args.reply
         # 用服务端 id 落库,监听收到回显时会补全这条而不是再插一条
-        st.save_message({'msg_id': msg_id, 'chat_id': args.chat_id, 'chat_type': 0, 'scope': 'topic' if in_topic else 'chat', 'anchor': root_id if in_topic else '', 'root_id': root_id or args.reply or '', 'parent_id': args.reply or root_id or '', 'from_id': client.auth.user_id, 'msg_type': 2 if args.post else 4, 'msg_type_name': 'POST' if args.post else 'TEXT', 'content': text, 'create_time': int(datetime.now().timestamp())}, sender_name='我', direction='out')
+        st.save_message({'msg_id': msg_id, 'chat_id': args.chat_id, 'chat_type': 0, 'scope': 'topic' if in_topic else 'chat', 'anchor': root_id if in_topic else '', 'root_id': root_id or args.reply or '', 'parent_id': args.reply or root_id or '', 'from_id': client.auth.user_id, 'msg_type': 2 if (args.post or args.rich) else 4, 'msg_type_name': 'POST' if (args.post or args.rich) else 'TEXT', 'content': text, 'create_time': int(datetime.now().timestamp())}, sender_name='我', direction='out')
         print(f'已发送 msg_id={msg_id}')
         return 0
     print('发送失败', file=sys.stderr)
@@ -444,6 +451,7 @@ def main():
     p.add_argument('--links', action='store_true', help='把文本里的 [文字](url) 发成带文字的超链接')
     p.add_argument('--post', action='store_true', help='按富文本发送:text 是 HTML 片段(<p><b><a href><ul><li><blockquote><at user_id>)')
     p.add_argument('--title', help='富文本标题(配合 --post)')
+    p.add_argument('--rich', help='结构化富文本 JSON(或 @文件路径),text 作为纯文本摘要;blocks: p/ul/quote/blank,run: text|link|at')
     p.set_defaults(fn=cmd_send)
     p = sub.add_parser('message-link', help='生成消息链接(applink client/message/link/open?token=...);多个消息 id 生成一个合并链接')
     p.add_argument('chat_id')
