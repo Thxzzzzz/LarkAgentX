@@ -61,6 +61,7 @@ Lark Agentx 是一个现代化的 Python 应用程序，能够:
 | `lark auth import` | 粘贴 cookie 登录 |
 | `lark auth check` | 校验凭证是否过期 |
 | `lark send <chat_id> <text>` | 发送文本消息(`--root` 回复进话题,`--reply <msg_id>` 引用回复某条消息) |
+| `lark message-link <chat_id> <msg_id>` | 生成某条消息的官方消息链接(点开定位到该消息) |
 | `lark listen` | 常驻: WS 收消息入库 |
 | `lark listen --agent` | 常驻: 收消息 + 接 coding agent 自动回复 |
 | `lark messages <chat_id>` | 读本地消息记录(`--anchor` 只看话题) |

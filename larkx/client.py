@@ -173,6 +173,12 @@ class LarkClient:
         pkt = builders.build_create_chat_packet(str(user_id), generate_long_request_id())
         return builders.decode_put_chat_response(self._gateway_post(pkt))
 
+    def message_link(self, chat_id: str, message_id: str):
+        """生成某条消息的官方"消息链接"(客户端"复制消息链接"同款):
+        applink .../client/message/link/open?token=...,点开直接定位到该消息。话题内消息同样以会话为来源。"""
+        resp = self.api('messages.PutMessageLinkRequest', {'fromId': str(chat_id), 'from': 1, 'copiedId': [str(message_id)]})
+        return (resp or {}).get('tokenUrl') or None
+
     def get_user_name(self, user_id: str, chat_id: str):
         try:
             pkt = builders.build_user_info_packet(str(user_id), str(chat_id), generate_long_request_id())
