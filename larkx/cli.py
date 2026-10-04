@@ -174,7 +174,7 @@ def cmd_send(args):
 
 def cmd_message_link(args):
     client = LarkClient(LarkAuth())
-    url = client.message_link(args.chat_id, args.message_id)
+    url = client.message_link(args.chat_id, args.message_ids)
     if not url:
         print('生成消息链接失败', file=sys.stderr)
         return 1
@@ -429,9 +429,9 @@ def main():
     p.add_argument('--root', help='话题/线程根消息 id,回复进话题')
     p.add_argument('--reply', help='引用回复某条消息 id(被引用消息在话题里时自动进话题)')
     p.set_defaults(fn=cmd_send)
-    p = sub.add_parser('message-link', help='生成某条消息的官方消息链接(applink client/message/link/open?token=...)')
+    p = sub.add_parser('message-link', help='生成消息链接(applink client/message/link/open?token=...);多个消息 id 生成一个合并链接')
     p.add_argument('chat_id')
-    p.add_argument('message_id')
+    p.add_argument('message_ids', nargs='+')
     p.set_defaults(fn=cmd_message_link)
     p = sub.add_parser('config', help='查看生效中的配置(配置项写在 .env 里)')
     p.set_defaults(fn=cmd_config)
