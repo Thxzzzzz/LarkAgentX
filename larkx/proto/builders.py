@@ -68,6 +68,29 @@ def build_send_message_packet(text: str, chat_id: str, request_id: str, root_id:
     return wrap_packet(5, req, request_id)
 
 
+def build_post_message_packet(html: str, chat_id: str, request_id: str, title: str='', root_id: str=None, thread_chat: bool=False, reply_to: str=None) -> P.Packet:
+    """富文本(POST)消息:content.text 直接放 HTML 片段,服务端自行解析为富文本元素。
+    实测可用标签:<p> <b> <i> <u> <a href> <ul><li> <ol><li> <blockquote> <at user_id="">;title 可空。"""
+    req = P.PutMessageRequest()
+    req.type = 2
+    req.chatId = str(chat_id)
+    req.cid = generate_request_cid()
+    req.isNotified = 1
+    req.version = 1
+    if reply_to and (not root_id or str(root_id) == str(reply_to)):
+        req.rootId = str(reply_to)
+        req.parentId = str(reply_to)
+    elif root_id:
+        req.rootId = str(root_id)
+        req.parentId = str(reply_to or root_id)
+        if not thread_chat:
+            req.isReplyInThread = True
+    if title:
+        req.content.title = title
+    req.content.text = html
+    return wrap_packet(5, req, request_id)
+
+
 def build_create_chat_packet(user_id: str, request_id: str) -> P.Packet:
     req = P.PutChatRequest()
     req.type = 1

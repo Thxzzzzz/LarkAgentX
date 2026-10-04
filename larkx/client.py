@@ -145,6 +145,17 @@ class LarkClient:
         resp.raise_for_status()
         return resp.content
 
+    def send_post(self, html: str, chat_id: str, title: str='', root_id: str=None, reply_to: str=None):
+        """发富文本(POST)消息,正文是 HTML 片段(<p><b><a href><ul><li><blockquote> 等);返回消息 id,失败 None。"""
+        thread_chat = bool(root_id) and self.is_thread_chat(chat_id)
+        pkt = builders.build_post_message_packet(html, str(chat_id), generate_long_request_id(), title=title, root_id=root_id, thread_chat=thread_chat, reply_to=reply_to)
+        try:
+            content = self._gateway_post(pkt)
+            return builders.decode_put_message_response(content) or None
+        except Exception as e:
+            logger.error(f'发送富文本失败: {e}')
+            return None
+
     def send_msg(self, text: str, chat_id: str, root_id: str=None, reply_to: str=None, rich_links: bool=False):
         """返回服务端分配的消息 id;未能确认发送成功(请求失败,或响应里拿不到 id)时返回 None。
         root_id: 回复进话题; reply_to: 引用某条消息(在话题内引用时同时给 root_id);
