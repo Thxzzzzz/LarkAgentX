@@ -161,7 +161,7 @@ def cmd_send(args):
         quoted = st.get_message(args.reply, args.chat_id)
         if quoted is not None and quoted.scope == 'topic' and quoted.anchor:
             root_id = quoted.anchor
-    msg_id = client.send_msg(text, args.chat_id, root_id=root_id, reply_to=args.reply)
+    msg_id = client.send_msg(text, args.chat_id, root_id=root_id, reply_to=args.reply, rich_links=args.links)
     if msg_id:
         in_topic = bool(root_id) and root_id != args.reply
         # 用服务端 id 落库,监听收到回显时会补全这条而不是再插一条
@@ -438,6 +438,7 @@ def main():
     p.add_argument('text', nargs='+')
     p.add_argument('--root', help='话题/线程根消息 id,回复进话题')
     p.add_argument('--reply', help='引用回复某条消息 id(被引用消息在话题里时自动进话题)')
+    p.add_argument('--links', action='store_true', help='把文本里的 [文字](url) 发成带文字的超链接')
     p.set_defaults(fn=cmd_send)
     p = sub.add_parser('message-link', help='生成消息链接(applink client/message/link/open?token=...);多个消息 id 生成一个合并链接')
     p.add_argument('chat_id')

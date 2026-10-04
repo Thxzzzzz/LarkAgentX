@@ -145,11 +145,12 @@ class LarkClient:
         resp.raise_for_status()
         return resp.content
 
-    def send_msg(self, text: str, chat_id: str, root_id: str=None, reply_to: str=None):
+    def send_msg(self, text: str, chat_id: str, root_id: str=None, reply_to: str=None, rich_links: bool=False):
         """返回服务端分配的消息 id;未能确认发送成功(请求失败,或响应里拿不到 id)时返回 None。
-        root_id: 回复进话题; reply_to: 引用某条消息(在话题内引用时同时给 root_id)。"""
+        root_id: 回复进话题; reply_to: 引用某条消息(在话题内引用时同时给 root_id);
+        rich_links: 把 [文字](url) 渲染成带文字的超链接。"""
         thread_chat = bool(root_id) and self.is_thread_chat(chat_id)
-        pkt = builders.build_send_message_packet(text, str(chat_id), generate_long_request_id(), root_id=root_id, thread_chat=thread_chat, reply_to=reply_to)
+        pkt = builders.build_send_message_packet(text, str(chat_id), generate_long_request_id(), root_id=root_id, thread_chat=thread_chat, reply_to=reply_to, rich_links=rich_links)
         try:
             content = self._gateway_post(pkt)
         except Exception as e:

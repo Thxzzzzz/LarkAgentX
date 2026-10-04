@@ -1,3 +1,6 @@
+import re
+
+from . import lark_all_pb2 as L
 from . import proto_pb2 as P
 from .ids import generate_request_cid
 
@@ -11,10 +14,40 @@ def wrap_packet(cmd: int, payload_msg, request_id: str) -> P.Packet:
     return pkt
 
 
-def build_send_message_packet(text: str, chat_id: str, request_id: str, root_id: str=None, thread_chat: bool=False, reply_to: str=None) -> P.Packet:
+LINK_RE = re.compile(r'\[([^\]\n]+)\]\((https?://[^\s)]+)\)')
+
+
+def _fill_rich_text(rt, text: str, rich_links: bool):
+    """把文本填进 richText:rich_links 时 [文字](url) 变成带文字的超链接元素(tag A),其余为文本元素。
+    实测网页协议的 TEXT 消息接受多个 TEXT/A 元素;加粗、段落、POST 类型都会被服务端拒绝(400)。"""
+    n = [0]
+    def nid():
+        n[0] += 1
+        return str(n[0])
+    def add_text(s):
+        if not s:
+            return
+        i = nid(); el = rt.elements.dictionary[i]; el.tag = 1
+        tp = P.TextProperty(); tp.content = s; el.property = tp.SerializeToString()
+        rt.elementIds.append(i)
+    def add_anchor(label, href):
+        i = nid(); el = rt.elements.dictionary[i]; el.tag = 6
+        ap = L.entities.RichTextElement.AnchorProperty(); ap.href = href; ap.content = label
+        el.property = ap.SerializeToString()
+        rt.elementIds.append(i); rt.anchorIds.append(i)
+    if not rich_links:
+        add_text(text)
+    else:
+        pos = 0
+        for m in LINK_RE.finditer(text):
+            add_text(text[pos:m.start()]); add_anchor(m.group(1), m.group(2)); pos = m.end()
+        add_text(text[pos:])
+    rt.innerText = text
+
+
+def build_send_message_packet(text: str, chat_id: str, request_id: str, root_id: str=None, thread_chat: bool=False, reply_to: str=None, rich_links: bool=False) -> P.Packet:
     """root_id: 回复进话题(根消息 id); reply_to: 引用回复某条消息(parentId 指向它, rootId 指向它所在的根, 不设 isReplyInThread 时就是普通的引用样式)。"""
     cid_1 = generate_request_cid()
-    cid_2 = generate_request_cid()
     req = P.PutMessageRequest()
     req.type = 4
     req.chatId = str(chat_id)
@@ -31,12 +64,7 @@ def build_send_message_packet(text: str, chat_id: str, request_id: str, root_id:
         # 普通群缺 isReplyInThread 会落进主会话;话题群反而拒收它(replyInThread not support chat)
         if not thread_chat:
             req.isReplyInThread = True
-    req.content.richText.elementIds.append(cid_2)
-    req.content.richText.innerText = text
-    req.content.richText.elements.dictionary[cid_2].tag = 1
-    tp = P.TextProperty()
-    tp.content = str(text)
-    req.content.richText.elements.dictionary[cid_2].property = tp.SerializeToString()
+    _fill_rich_text(req.content.richText, str(text), rich_links)
     return wrap_packet(5, req, request_id)
 
 
