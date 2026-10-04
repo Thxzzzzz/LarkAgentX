@@ -180,6 +180,10 @@ class LarkClient:
         resp = self.api('messages.PutMessageLinkRequest', {'fromId': str(chat_id), 'from': 1, 'copiedId': [str(m) for m in ids]})
         return (resp or {}).get('tokenUrl') or None
 
+    def self_chat(self):
+        """当前账号与自己的会话(Lark 允许给自己发消息);不存在时服务端会创建。返回 chat_id。"""
+        return self.create_chat(self.auth.user_id)
+
     def get_user_name(self, user_id: str, chat_id: str):
         try:
             pkt = builders.build_user_info_packet(str(user_id), str(chat_id), generate_long_request_id())

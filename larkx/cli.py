@@ -182,6 +182,16 @@ def cmd_message_link(args):
     return 0
 
 
+def cmd_self_chat(args):
+    client = LarkClient(LarkAuth())
+    cid = client.self_chat()
+    if not cid:
+        print('获取自聊会话失败', file=sys.stderr)
+        return 1
+    print(cid)
+    return 0
+
+
 def cmd_config(args):
     from .config import load_config
     cfg = load_config()
@@ -433,6 +443,8 @@ def main():
     p.add_argument('chat_id')
     p.add_argument('message_ids', nargs='+')
     p.set_defaults(fn=cmd_message_link)
+    p = sub.add_parser('self-chat', help='打印当前账号与自己的会话 chat_id(可用于 lark send 给自己留言)')
+    p.set_defaults(fn=cmd_self_chat)
     p = sub.add_parser('config', help='查看生效中的配置(配置项写在 .env 里)')
     p.set_defaults(fn=cmd_config)
     p = sub.add_parser('chats', help='列出本地会话')
