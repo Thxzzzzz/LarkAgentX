@@ -92,6 +92,10 @@ def _fill_rich_blocks(rt, blocks: list, inner_text: str):
         if 'link' in run:
             ap = L.entities.RichTextElement.AnchorProperty()
             ap.href = str(run['link']['href']); ap.content = str(run['link'].get('text') or run['link']['href'])
+            if ap.content != ap.href:
+                # 自定义链接文字:客户端据 isCustom/scene 决定按文字渲染;否则会显示成"来自 xx 的消息链接"预览块
+                ap.isCustom = True
+                ap.scene = 3
             i = el(6, prop=ap.SerializeToString()); rt.anchorIds.append(i); return i
         if 'at' in run:
             at = P.AtProperty(); at.userId = str(run['at']['user_id']); at.content = str(run['at'].get('text') or '')
