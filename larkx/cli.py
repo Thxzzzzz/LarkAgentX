@@ -202,6 +202,17 @@ def cmd_self_chat(args):
     return 0
 
 
+def cmd_read(args):
+    client = LarkClient(LarkAuth())
+    try:
+        n = client.read_messages(args.chat_id, args.message_ids)
+    except Exception as e:
+        print(f'标记已读失败: {e}', file=sys.stderr)
+        return 1
+    print(f'已读 {n} 条')
+    return 0
+
+
 def cmd_config(args):
     from .config import load_config
     cfg = load_config()
@@ -459,6 +470,10 @@ def main():
     p.set_defaults(fn=cmd_message_link)
     p = sub.add_parser('self-chat', help='打印当前账号与自己的会话 chat_id(可用于 lark send 给自己留言)')
     p.set_defaults(fn=cmd_self_chat)
+    p = sub.add_parser('read', help='把消息标为已读(同客户端看过:未读推进到其中最新一条,发送方看到已读;话题回复按话题标记)')
+    p.add_argument('chat_id')
+    p.add_argument('message_ids', nargs='+')
+    p.set_defaults(fn=cmd_read)
     p = sub.add_parser('config', help='查看生效中的配置(配置项写在 .env 里)')
     p.set_defaults(fn=cmd_config)
     p = sub.add_parser('chats', help='列出本地会话')

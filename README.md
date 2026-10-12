@@ -62,6 +62,7 @@ Lark Agentx 是一个现代化的 Python 应用程序，能够:
 | `lark auth check` | 校验凭证是否过期 |
 | `lark send <chat_id> <text>` | 发送文本消息(`--root` 回复进话题,`--reply <msg_id>` 引用回复,`--links` 把 `[文字](url)` 发成超链接,`--post [--title]` 按富文本发送 HTML 片段,`--rich <json|@file>` 发结构化富文本) |
 | `lark message-link <chat_id> <msg_id...>` | 生成官方消息链接(单条定位到该消息;多条为合并链接,预览展示多条) |
+| `lark read <chat_id> <msg_id...>` | 把消息标为已读(同客户端看过;话题回复按话题标记) |
 | `lark self-chat` | 打印与自己的会话 chat_id(给自己留言用) |
 | `lark listen` | 常驻: WS 收消息入库 |
 | `lark listen --agent` | 常驻: 收消息 + 接 coding agent 自动回复 |

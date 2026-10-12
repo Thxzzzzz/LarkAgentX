@@ -224,6 +224,43 @@ class LarkClient:
             logger.debug(f'标记已读失败: {e}')
             return False
 
+    def read_messages(self, chat_id: str, message_ids) -> int:
+        """把这些消息标为已读,效果同在客户端里看过它们:会话/话题的未读推进到其中最新一条,发送方看到"已读"。
+        主会话里的消息按 position 推进会话已读位置;话题回复按 threadPosition 推进该话题,
+        请求里的 maxPosition 用话题根消息的 position(服务端要求必填,且只会前进不会回退)。
+        消息不存在、不属于该会话或请求失败时抛异常。返回标记的消息数。"""
+        ids = [str(m) for m in ([message_ids] if isinstance(message_ids, str) else message_ids)]
+        found = (self.api('messages.PullMessagesByIdsRequest', {'messageIds': ids}) or {}).get('messages') or {}
+        missing = [m for m in ids if m not in found]
+        if missing:
+            raise ValueError(f'找不到消息: {", ".join(missing)}')
+        chat_ids, chat_max = [], -1
+        threads = {}
+        for mid in ids:
+            v = found[mid]
+            if str(v.get('chatId')) != str(chat_id):
+                raise ValueError(f'消息 {mid} 不在会话 {chat_id} 里')
+            position = v.get('position')
+            if position is not None and position >= 0:
+                chat_ids.append(mid)
+                chat_max = max(chat_max, position)
+            # 只有真正的话题回复带 threadPosition(>=0;根消息为 -1);普通群的引用回复只有 position,在主会话里
+            thread_id, thread_position = v.get('threadId'), v.get('threadPosition')
+            if thread_id and thread_position is not None and thread_position >= 0:
+                ids_in_thread, thread_max = threads.get(thread_id, ([], -1))
+                ids_in_thread.append(mid)
+                threads[thread_id] = (ids_in_thread, max(thread_max, thread_position))
+        if chat_ids:
+            self.api('messages.PutReadMessagesRequest', {'chatId': str(chat_id), 'maxPosition': chat_max, 'messageIds': chat_ids})
+        if threads:
+            roots = (self.api('messages.PullMessagesByIdsRequest', {'messageIds': list(threads)}) or {}).get('messages') or {}
+            for thread_id, (ids_in_thread, thread_max) in threads.items():
+                root_position = (roots.get(thread_id) or {}).get('position')
+                if root_position is None:
+                    raise ValueError(f'找不到话题根消息: {thread_id}')
+                self.api('messages.PutReadMessagesRequest', {'chatId': str(chat_id), 'maxPosition': root_position, 'threadId': thread_id, 'threadMaxPosition': thread_max, 'messageIds': ids_in_thread})
+        return len(ids)
+
     def get_group_name(self, chat_id: str):
         try:
             pkt = builders.build_group_info_packet(str(chat_id), generate_long_request_id())
